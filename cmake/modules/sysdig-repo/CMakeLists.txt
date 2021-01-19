@@ -19,7 +19,7 @@ message(STATUS "Driver version: ${SYSDIG_VERSION}")
 
 ExternalProject_Add(
   sysdig
-  URL "https://github.com/draios/sysdig/archive/${SYSDIG_VERSION}.tar.gz"
+  URL "https://github.com/leogr/falco-libs/archive/${SYSDIG_VERSION}.tar.gz"
   URL_HASH "${SYSDIG_CHECKSUM}"
   CONFIGURE_COMMAND ""
   BUILD_COMMAND ""
