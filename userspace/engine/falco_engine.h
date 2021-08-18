@@ -152,8 +152,8 @@ public:
 	//
 	void set_extra(string &extra, bool replace_container_info);
 
-	// **Methods Related to k8s audit log events, which are
-	// **represented as json objects.
+	// Represents the result of matching an event against a set of
+	// rules.
 	struct rule_result {
 		gen_event *evt;
 		std::string rule;
@@ -162,16 +162,6 @@ public:
 		std::string format;
 		std::set<std::string> exception_fields;
 	};
-
-	//
-	// Given a raw json object, return a list of k8s audit event
-	// objects that represent the object. This method handles
-	// things such as EventList splitting.
-	//
-	// Returns true if the json object was recognized as a k8s
-	// audit event(s), false otherwise.
-	//
-	bool parse_k8s_audit_json(nlohmann::json &j, std::list<json_event> &evts, bool top=true);
 
 	//
 	// Given an event, check it against the set of rules in the
@@ -243,8 +233,6 @@ public:
 	json_event_filter_factory &json_factory();
 
 private:
-
-	static nlohmann::json::json_pointer k8s_audit_time;
 
 	//
 	// Determine whether the given event should be matched at all
