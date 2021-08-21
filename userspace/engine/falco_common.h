@@ -94,8 +94,6 @@ protected:
 
 	std::mutex m_ls_semaphore;
 
-	sinsp *m_inspector;
-
 private:
 	void add_lua_path(std::string &path);
 };

@@ -1464,9 +1464,49 @@ gen_event_filter_check *json_event_filter_factory::new_filtercheck(const char *f
 	return NULL;
 }
 
-std::list<json_event_filter_check::check_info> &json_event_filter_factory::get_fields()
+std::list<gen_event_filter_factory::filter_fieldclass_info> json_event_filter_factory::get_fields()
 {
-	return m_info;
+	std::list<gen_event_filter_factory::filter_fieldclass_info> ret;
+
+	// It's not quite copy to the public information, as m_info
+	// has addl info about indexing. That info is added to the
+	// description.
+
+	for(auto &chk: m_defined_checks)
+	{
+		gen_event_filter_factory::filter_fieldclass_info cinfo;
+		cinfo.name = chk.m_name;
+		cinfo.desc = chk.m_desc;
+		cinfo.class_info = chk.m_class_info;
+
+		for(auto &field : chk->m_fields)
+		{
+			gen_event_filter_factory::filter_field_info info;
+			info.name = field.m_name;
+			info.desc = field.m_desc;
+
+			switch(field.idx_mode)
+			{
+			case json_event_filter_check::IDX_REQUIRED:
+			case json_event_filter_check::IDX_ALLOWED:
+				info.desc += " (";
+				info.desc += json_event_filter_check::s_index_mode_strs[field.idx_mode];
+				info.desc += ", ";
+				info.desc += json_event_filter_check::s_index_type_strs[field.idx_type];
+				info.desc += ")";
+				break;
+			case json_event_filter_check::IDX_NONE:
+			default:
+				break;
+			};
+
+			cinfo.fields.emplace_back(std::move(info));
+		}
+
+		ret.emplace_back(std::move(cinfo));
+	}
+
+	return ret;
 }
 
 json_event_formatter::json_event_formatter(json_event_filter_factory &json_factory, std::string &format):

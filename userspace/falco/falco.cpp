@@ -255,6 +255,8 @@ uint64_t do_inspect(falco_engine *engine,
 	uint64_t duration_start = 0;
 	uint32_t timeouts_since_last_success_or_msg = 0;
 
+	std::string syscall_source = "syscall";
+
 	sdropmgr.init(inspector,
 		      outputs,
 		      config.m_syscall_evt_drop_actions,
@@ -368,7 +370,7 @@ uint64_t do_inspect(falco_engine *engine,
 		// engine, which will match the event against the set
 		// of rules. If a match is found, pass the event to
 		// the outputs.
-		unique_ptr<falco_engine::rule_result> res = engine->process_sinsp_event(ev);
+		unique_ptr<falco_engine::rule_result> res = engine->process_event(syscall_source, ev);
 		if(res)
 		{
 			outputs->handle_event(res->evt, res->rule, res->source, res->priority_num, res->format);
@@ -421,21 +423,14 @@ static void print_all_ignored_events(sinsp *inspector)
 	printf("\n");
 }
 
-static void list_source_fields(falco_engine *engine, bool verbose, bool names_only, std::string &source)
+static void list_source_fields(falco_engine *engine, bool names_only, std::string &source)
 {
 	if(source.size() > 0 &&
 	   !(source == "syscall" || source == "k8s_audit"))
 	{
 		throw std::invalid_argument("Value for --list must be \"syscall\" or \"k8s_audit\"");
 	}
-	if(source == "" || source == "syscall")
-	{
-		list_fields(verbose, false, names_only);
-	}
-	if(source == "" || source == "k8s_audit")
-	{
-		engine->list_fields(names_only);
-	}
+	engine->list_fields(source, names_only);
 }
 
 //
@@ -762,12 +757,19 @@ int falco_init(int argc, char **argv)
 		}
 
 		engine = new falco_engine(true, alternate_lua_dir);
-		engine->set_inspector(inspector);
 		engine->set_extra(output_format, replace_container_info);
+
+		// Create "factories" that can create rules for
+		// syscalls and k8s audit events.
+		std::shared_ptr<gen_event_filter_factory> sinsp_factory(new sinsp_filter_factory(m_inspector));
+		std::shared_ptr<gen_event_filter_factory> json_factory(new json_event_filter_factory());
+
+		engine->add_filter_factory("syscall", sinsp_factory);
+		engine->add_filter_factory("k8s_audit", json_factory);
 
 		if(list_flds)
 		{
-			list_source_fields(engine, verbose, names_only, list_flds_source);
+			list_source_fields(engine, names_only, list_flds_source);
 			return EXIT_SUCCESS;
 		}
 

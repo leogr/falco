@@ -69,7 +69,7 @@ priorities = {
 --[[
    Take a filter AST and set it up in the libsinsp runtime, using the filter API.
 --]]
-local function install_filter(node, filter_api_lib, lua_parser, parent_bool_op)
+local function create_filter_obj(node, lua_parser, parent_bool_op)
    local t = node.type
 
    if t == "BinaryBoolOp" then
@@ -78,40 +78,40 @@ local function install_filter(node, filter_api_lib, lua_parser, parent_bool_op)
       -- never necessary when we have identical successive operators. so we
       -- avoid it as a runtime performance optimization.
       if (not(node.operator == parent_bool_op)) then
-	 filter_api_lib.nest(lua_parser) -- io.write("(")
+	 filter.nest(lua_parser) -- io.write("(")
       end
 
-      install_filter(node.left, filter_api_lib, lua_parser, node.operator)
-      filter_api_lib.bool_op(lua_parser, node.operator) -- io.write(" "..node.operator.." ")
-      install_filter(node.right, filter_api_lib, lua_parser, node.operator)
+      create_filter_obj(node.left, filter, lua_parser, node.operator)
+      filter.bool_op(lua_parser, node.operator) -- io.write(" "..node.operator.." ")
+      create_filter_obj(node.right, filter, lua_parser, node.operator)
 
       if (not (node.operator == parent_bool_op)) then
-	 filter_api_lib.unnest(lua_parser) -- io.write(")")
+	 filter.unnest(lua_parser) -- io.write(")")
       end
 
    elseif t == "UnaryBoolOp" then
-      filter_api_lib.nest(lua_parser) --io.write("(")
-      filter_api_lib.bool_op(lua_parser, node.operator) -- io.write(" "..node.operator.." ")
-      install_filter(node.argument, filter_api_lib, lua_parser)
-      filter_api_lib.unnest(lua_parser) -- io.write(")")
+      filter.nest(lua_parser) --io.write("(")
+      filter.bool_op(lua_parser, node.operator) -- io.write(" "..node.operator.." ")
+      create_filter_obj(node.argument, filter, lua_parser)
+      filter.unnest(lua_parser) -- io.write(")")
 
    elseif t == "BinaryRelOp" then
       if (node.operator == "in" or
           node.operator == "intersects" or
 	  node.operator == "pmatch") then
 	 elements = map(function (el) return el.value end, node.right.elements)
-	 filter_api_lib.rel_expr(lua_parser, node.left.value, node.operator, elements, node.index)
+	 filter.rel_expr(lua_parser, node.left.value, node.operator, elements, node.index)
       else
-	 filter_api_lib.rel_expr(lua_parser, node.left.value, node.operator, node.right.value, node.index)
+	 filter.rel_expr(lua_parser, node.left.value, node.operator, node.right.value, node.index)
       end
       -- io.write(node.left.value.." "..node.operator.." "..node.right.value)
 
    elseif t == "UnaryRelOp"  then
-      filter_api_lib.rel_expr(lua_parser, node.argument.value, node.operator, node.index)
+      filter.rel_expr(lua_parser, node.argument.value, node.operator, node.index)
       --io.write(node.argument.value.." "..node.operator)
 
    else
-      error ("Unexpected type in install_filter: "..t)
+      error ("Unexpected type in create_filter_obj: "..t)
    end
 end
 
@@ -328,11 +328,12 @@ function validate_exception_item_multi_fields(eitem, context)
 	 return false, build_error_with_context(context, "Rule exception item "..name..": fields and comps lists must have equal length"), warnings
       end
    end
-   for k, fname in ipairs(fields) do
-      if not is_defined_filter(fname) then
-	 return false, build_error_with_context(context, "Rule exception item "..name..": field name "..fname.." is not a supported filter field"), warnings
-      end
-   end
+   -- XXX/mstemm Add this back
+   -- for k, fname in ipairs(fields) do
+   --    if not is_defined_filter(fname) then
+   -- 	 return false, build_error_with_context(context, "Rule exception item "..name..": field name "..fname.." is not a supported filter field"), warnings
+   --    end
+   -- end
    for k, comp in ipairs(comps) do
       if defined_comp_operators[comp] == nil then
 	 return false, build_error_with_context(context, "Rule exception item "..name..": comparison operator "..comp.." is not a supported comparison operator"), warnings
@@ -355,44 +356,14 @@ function validate_exception_item_single_field(eitem, context)
 	 return false, build_error_with_context(context, "Rule exception item "..name..": fields and comps must both be strings"), warnings
       end
    end
-   if not is_defined_filter(fields) then
-      return false, build_error_with_context(context, "Rule exception item "..name..": field name "..fields.." is not a supported filter field"), warnings
-   end
+   -- XXX/mstemm add this back
+   -- if not is_defined_filter(fields) then
+   --    return false, build_error_with_context(context, "Rule exception item "..name..": field name "..fields.." is not a supported filter field"), warnings
+   -- end
    if defined_comp_operators[comps] == nil then
       return false, build_error_with_context(context, "Rule exception item "..name..": comparison operator "..comps.." is not a supported comparison operator"), warnings
    end
 end
-
-function is_defined_filter(filter)
-   if defined_noarg_filters[filter] ~= nil then
-      return true
-   else
-      bracket_idx = string.find(filter, "[", 1, true)
-
-      if bracket_idx ~= nil then
-	 subfilter = string.sub(filter, 1, bracket_idx-1)
-
-	 if defined_arg_filters[subfilter] ~= nil then
-	    return true
-	 end
-      end
-
-      dot_idx = string.find(filter, ".", 1, true)
-
-      while dot_idx ~= nil do
-	 subfilter = string.sub(filter, 1, dot_idx-1)
-
-	 if defined_arg_filters[subfilter] ~= nil then
-	    return true
-	 end
-
-	 dot_idx = string.find(filter, ".", dot_idx+1, true)
-      end
-   end
-
-   return false
-end
-
 
 function load_rules_doc(rules_mgr, doc, load_state)
 
@@ -771,9 +742,7 @@ end
 -- - required engine version. will be nil when load result is false
 -- - List of Errors
 -- - List of Warnings
-function load_rules(sinsp_lua_parser,
-		    json_lua_parser,
-		    rules_content,
+function load_rules(rules_content,
 		    rules_mgr,
 		    verbose,
 		    all_events,
@@ -883,12 +852,6 @@ function load_rules(sinsp_lua_parser,
 	 return false, nil, build_error_with_context(v['context'], ast), warnings
       end
 
-      if v['source'] == "syscall" then
-	 if not all_events then
-	    sinsp_rule_utils.check_for_ignored_syscalls_events(ast, 'macro', v['condition'])
-	 end
-      end
-
       state.macros[v['macro']] = {["ast"] = ast.filter.value, ["used"] = false}
    end
 
@@ -933,40 +896,30 @@ function load_rules(sinsp_lua_parser,
 	 warn_evttypes = v['warn_evttypes']
       end
 
-      local status, filter_ast, filters = compiler.compile_filter(v['rule'], v['compile_condition'],
-								  state.macros, state.lists)
+      local status, filter_ast = compiler.compile_filter(v['rule'], v['compile_condition'],
+							 state.macros, state.lists)
 
       if status == false then
 	 return false, nil, build_error_with_context(v['context'], filter_ast), warnings
       end
 
-      local evtttypes = {}
-      local syscallnums = {}
-
-      if v['source'] == "syscall" then
-	 if not all_events then
-	    sinsp_rule_utils.check_for_ignored_syscalls_events(filter_ast, 'rule', v['rule'])
-	 end
-
-	 evttypes, syscallnums = sinsp_rule_utils.get_evttypes_syscalls(name, filter_ast, v['compile_condition'], warn_evttypes, verbose)
-      end
-
       -- If a filter in the rule doesn't exist, either skip the rule
       -- or raise an error, depending on the value of
       -- skip-if-unknown-filter.
-      for filter, _ in pairs(filters) do
-	 if not is_defined_filter(filter) then
-	    msg = "rule \""..v['rule'].."\": contains unknown filter "..filter
-	    warnings[#warnings + 1] = msg
+      -- XXX/mstemm add this back
+      -- for filter, _ in pairs(filters) do
+      -- 	 if not is_defined_filter(filter) then
+      -- 	    msg = "rule \""..v['rule'].."\": contains unknown filter "..filter
+      -- 	    warnings[#warnings + 1] = msg
 
-	    if not v['skip-if-unknown-filter'] then
-	       return false, nil, build_error_with_context(v['context'], msg), warnings
-	    else
-	       print("Skipping "..msg)
-	       goto next_rule
-	    end
-	 end
-      end
+      -- 	    if not v['skip-if-unknown-filter'] then
+      -- 	       return false, nil, build_error_with_context(v['context'], msg), warnings
+      -- 	    else
+      -- 	       print("Skipping "..msg)
+      -- 	       goto next_rule
+      -- 	    end
+      -- 	 end
+      -- end
 
       if (filter_ast.type == "Rule") then
 	 state.n_rules = state.n_rules + 1
@@ -983,16 +936,10 @@ function load_rules(sinsp_lua_parser,
 	 if (v['tags'] == nil) then
 	    v['tags'] = {}
 	 end
-	 if v['source'] == "syscall" then
-	    install_filter(filter_ast.filter.value, filter, sinsp_lua_parser)
-	    -- Pass the filter and event types back up
-	    falco_rules.add_filter(rules_mgr, v['rule'], evttypes, syscallnums, v['tags'])
 
-	 elseif v['source'] == "k8s_audit" then
-	    install_filter(filter_ast.filter.value, k8s_audit_filter, json_lua_parser)
-
-	    falco_rules.add_k8s_audit_filter(rules_mgr, v['rule'], v['tags'])
-	 end
+	 lua_parser = falco_rules.create_lua_parser(rules_mgr, v['source'])
+	 create_filter_obj(filter_ast.filter.value, lua_parser)
+	 falco_rules.add_filter(rules_mgr, lua_parser, v['rule'], v['source'], v['tags'])
 
 	 -- Rule ASTs are merged together into one big AST, with "OR" between each
 	 -- rule.
