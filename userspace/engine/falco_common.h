@@ -71,8 +71,6 @@ public:
 
 	void init(const char *lua_main_filename, const char *alternate_lua_dir);
 
-	void set_inspector(sinsp *inspector);
-
     // Priority levels, as a vector of strings
 	static std::vector<std::string> priority_names;
 

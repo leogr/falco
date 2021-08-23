@@ -99,7 +99,7 @@ private:
 		// NOTE: This is used only when the event sub-type is 0.
 		std::vector<std::set<std::shared_ptr<filter_wrapper>>> m_filter_by_event_type;
 
-		std::set<std::shared_ptr<filter_wrapper>>> m_filter_all_event_types;
+		std::set<std::shared_ptr<filter_wrapper>> m_filter_all_event_types;
 
 		// All filters added. Used to make num_filters() fast.
 		std::set<std::shared_ptr<filter_wrapper>> m_filters;

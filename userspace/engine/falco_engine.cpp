@@ -73,16 +73,16 @@ uint32_t falco_engine::engine_version()
 
 #define CONSOLE_LINE_LEN 79
 
-void falco_engine::list_fields(std::string source, bool names_only)
+void falco_engine::list_fields(std::string &source, bool names_only)
 {
 	for(auto &it : m_filter_factories)
 	{
-		if(source != "" && source != it->first)
+		if(source != "" && source != it.first)
 		{
 			continue;
 		}
 
-		for(auto &chk_field : it->second.get_fields())
+		for(auto &chk_field : it.second->get_fields())
 		{
 			if(!names_only)
 			{
@@ -135,8 +135,7 @@ void falco_engine::load_rules(const string &rules_content, bool verbose, bool al
 {
 	if(!m_rules)
 	{
-		m_rules.reset(new falco_rules(m_inspector,
-					      this,
+		m_rules.reset(new falco_rules(this,
 					      m_ls));
 	}
 

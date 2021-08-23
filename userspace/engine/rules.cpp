@@ -42,8 +42,8 @@ falco_rules::falco_rules(falco_engine *engine,
 {
 }
 
-falco_rules::add_filter_factory(std::string &source,
-				std::shared_ptr<gen_event_filter_factory> factory)
+void falco_rules::add_filter_factory(std::string &source,
+				     std::shared_ptr<gen_event_filter_factory> factory)
 {
 	m_filter_factories[source] = factory;
 }
@@ -93,11 +93,11 @@ int falco_rules::create_lua_parser(lua_State *ls)
 		lua_error(ls);
 	}
 
-	lua_pushlightuserdata(lp);
+	lua_pushlightuserdata(ls, lp);
 	return 1;
 }
 
-lua_parser *falco_rules::create_lua_parser(std::sting &source, std::string &errstr)
+lua_parser *falco_rules::create_lua_parser(std::string &source, std::string &errstr)
 {
 	auto it = m_filter_factories.find(source);
 

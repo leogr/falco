@@ -55,7 +55,7 @@ public:
 
 	// Print to stdout (using printf) a description of each field supported by this engine.
 	// If source is non-empty, only fields for the provided source are printed.
-	void list_fields(std::set<std::string> &sources, bool names_only);
+	void list_fields(std::string &source, bool names_only);
 
 	//
 	// Load rules either directly or from a filename.
@@ -210,6 +210,9 @@ private:
 	// ratio/multiplier.
 	//
 	inline bool should_drop_evt();
+
+	// Maps from event source to object that can generate filters from rules
+	std::map<std::string, std::shared_ptr<gen_event_filter_factory>> m_filter_factories;
 
 	// Maps from event source to the set of rules for that event source
 	std::map<std::string, std::shared_ptr<falco_ruleset>> m_rulesets;
