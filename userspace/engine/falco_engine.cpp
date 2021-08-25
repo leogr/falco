@@ -144,8 +144,6 @@ void falco_engine::load_rules(const string &rules_content, bool verbose, bool al
 		}
 	}
 
-	falco_formats_lua::init(m_ls);
-
 	m_rules->load_rules(rules_content, verbose, all_events, m_extra, m_replace_container_info, m_min_priority, required_engine_version);
 }
 

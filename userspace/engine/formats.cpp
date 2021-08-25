@@ -20,57 +20,6 @@ limitations under the License.
 #include "falco_engine.h"
 #include "banned.h" // This raises a compilation error when certain functions are used
 
-const static struct luaL_Reg ll_falco[] =
-	{
-		{"is_format_valid", &falco_formats_lua::is_format_valid},
-		{NULL, NULL}};
-
-void falco_formats_lua::init(lua_State *ls)
-{
-	luaL_openlib(ls, "formats", ll_falco, 0);
-}
-
-int falco_formats_lua::is_format_valid(lua_State *ls)
-{
-
-	if (! lua_islightuserdata(ls, -3) ||
-	    ! lua_isstring(ls, -2) ||
-	    ! lua_isstring(ls, -1))
-	{
-		lua_pushstring(ls, "Invalid arguments passed to is_format_valid");
-		lua_error(ls);
-	}
-
-	falco_engine *engine = (falco_engine *) lua_topointer(ls, -3);
-	string source = luaL_checkstring(ls, -2);
-	string format = luaL_checkstring(ls, -1);
-
-	try
-	{
-		std::shared_ptr<gen_event_formatter> formatter;
-
-		formatter = engine->create_formatter(source, format);
-
-		// Don't need to return anything--if the formatter was
-		// created without an exception that's success.
-		lua_pushnil(ls);
-	}
-	catch(exception &e)
-	{
-		std::ostringstream os;
-
-		os << "Invalid output format '"
-		   << format
-		   << "': '"
-		   << e.what()
-		   << "'";
-
-		lua_pushstring(ls, os.str().c_str());
-	}
-
-	return 1;
-}
-
 falco_formats::falco_formats(falco_engine *engine,
 			     bool json_include_output_property)
 	: m_falco_engine(engine),

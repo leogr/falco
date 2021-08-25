@@ -29,17 +29,6 @@ extern "C"
 
 #include "falco_engine.h"
 
-class sinsp_evt_formatter;
-
-class falco_formats_lua
-{
-public:
-	static void init(lua_State *ls);
-
-	// formatter = formats.is_format_valid(source, format_string)
-	static int is_format_valid(lua_State *ls);
-};
-
 class falco_formats
 {
 public:

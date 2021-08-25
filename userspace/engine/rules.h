@@ -45,12 +45,17 @@ class falco_rules
 			uint64_t &required_engine_version);
 	void describe_rule(string *rule);
 
+	bool is_format_valid(const std::string &source, const std::string &format, std::string &errstr);
+
 	static void init(lua_State *ls);
 	static int clear_filters(lua_State *ls);
 	static int create_lua_parser(lua_State *ls);
 	static int add_filter(lua_State *ls);
 	static int enable_rule(lua_State *ls);
 	static int engine_version(lua_State *ls);
+
+	// err = falco_rules.is_format_valid(source, format_string)
+	static int is_format_valid(lua_State *ls);
 
  private:
 	void clear_filters();

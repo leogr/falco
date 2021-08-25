@@ -989,7 +989,7 @@ function load_rules(rules_content,
 	 -- Ensure that the output field is properly formatted by
 	 -- creating a formatter from it. Any error will be thrown
 	 -- up to the top level.
-	 local err = formats.is_format_valid(rules_mgr, v['source'], v['output'])
+	 local err = falco_rules.is_format_valid(rules_mgr, v['source'], v['output'])
 	 if err ~= nil then
 	    return false, nil, build_error_with_context(v['context'], err), warnings
 	 end

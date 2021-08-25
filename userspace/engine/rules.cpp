@@ -34,6 +34,7 @@ const static struct luaL_Reg ll_falco_rules[] =
 		{"add_filter", &falco_rules::add_filter},
 		{"enable_rule", &falco_rules::enable_rule},
 		{"engine_version", &falco_rules::engine_version},
+		{"is_format_valid", &falco_rules::is_format_valid},
 		{NULL, NULL}};
 
 falco_rules::falco_rules(falco_engine *engine,
@@ -198,6 +199,63 @@ int falco_rules::engine_version(lua_State *ls)
 	lua_pushnumber(ls, rules->m_engine->engine_version());
 
 	return 1;
+}
+
+int falco_rules::is_format_valid(lua_State *ls)
+{
+	if (! lua_islightuserdata(ls, -3) ||
+	    ! lua_isstring(ls, -2) ||
+	    ! lua_isstring(ls, -1))
+	{
+		lua_pushstring(ls, "Invalid arguments passed to is_format_valid");
+		lua_error(ls);
+	}
+
+	falco_rules *rules = (falco_rules *) lua_topointer(ls, -3);
+	string source = luaL_checkstring(ls, -2);
+	string format = luaL_checkstring(ls, -1);
+	string errstr;
+
+	bool ret = rules->is_format_valid(source, format, errstr);
+
+	if (!ret)
+	{
+		lua_pushstring(ls, errstr.c_str());
+		lua_error(ls);
+	}
+	else
+	{
+		lua_pushnil(ls);
+	}
+
+	return 1;
+}
+
+bool falco_rules::is_format_valid(const std::string &source, const std::string &format, std::string &errstr)
+{
+	bool ret = true;
+
+	try
+	{
+		std::shared_ptr<gen_event_formatter> formatter;
+
+		formatter = m_engine->create_formatter(source, format);
+	}
+	catch(exception &e)
+	{
+		std::ostringstream os;
+
+		os << "Invalid output format '"
+		   << format
+		   << "': '"
+		   << e.what()
+		   << "'";
+
+		errstr = os.str();
+		ret = false;
+	}
+
+	return ret;
 }
 
 static std::list<std::string> get_lua_table_values(lua_State *ls, int idx)
