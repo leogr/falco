@@ -29,7 +29,7 @@ falco_ruleset::~falco_ruleset()
 {
 }
 
-falco_ruleset::ruleset_filters::ruleset_filters():
+falco_ruleset::ruleset_filters::ruleset_filters()
 {
 }
 
@@ -39,7 +39,7 @@ falco_ruleset::ruleset_filters::~ruleset_filters()
 
 void falco_ruleset::ruleset_filters::add_filter(std::shared_ptr<filter_wrapper> wrap)
 {
-	std::set<unit16_t> fevttypes = wrap->evttypes();
+	std::set<uint16_t> fevttypes = wrap->filter->evttypes();
 
 	if(fevttypes.empty())
 	{
@@ -64,11 +64,11 @@ void falco_ruleset::ruleset_filters::add_filter(std::shared_ptr<filter_wrapper> 
 
 void falco_ruleset::ruleset_filters::remove_filter(std::shared_ptr<filter_wrapper> wrap)
 {
-	std::set<unit16_t> fevttypes = wrap->evttypes();
+	std::set<uint16_t> fevttypes = wrap->filter->evttypes();
 
 	if(fevttypes.empty())
 	{
-		m_filter_all_event_types.remove(wrap);
+		m_filter_all_event_types.erase(wrap);
 	}
 	else
 	{
@@ -76,12 +76,12 @@ void falco_ruleset::ruleset_filters::remove_filter(std::shared_ptr<filter_wrappe
 		{
 			if( m_filter_by_event_type.size() < etype)
 			{
-				m_filter_by_event_type[etype].remove(wrap);
+				m_filter_by_event_type[etype].erase(wrap);
 			}
 		}
 	}
 
-	m_filters.remove(wrap);
+	m_filters.erase(wrap);
 }
 
 uint64_t falco_ruleset::ruleset_filters::num_filters()
@@ -118,15 +118,13 @@ bool falco_ruleset::ruleset_filters::run(gen_event *evt)
 
 void falco_ruleset::ruleset_filters::evttypes_for_ruleset(std::set<uint16_t> &evttypes)
 {
-	std::set<uint16_t> ret;
+	evttypes.clear();
 
-	for(auto &filter : m_filters)
+	for(auto &wrap : m_filters)
 	{
-		fevttypes = filter->evttypes();
-		ret.insert(fevttypes.begin(), fevttypes.end());
+		auto fevttypes = wrap->filter->evttypes();
+		evttypes.insert(fevttypes.begin(), fevttypes.end());
 	}
-
-	return ret;
 }
 
 void falco_ruleset::add(string &name,
@@ -227,7 +225,7 @@ bool falco_ruleset::run(gen_event *evt, uint16_t ruleset)
 	return m_rulesets[ruleset]->run(evt);
 }
 
-void falco_ruleset::evttypes_for_ruleset(vector<bool> &evttypes, uint16_t ruleset)
+void falco_ruleset::evttypes_for_ruleset(set<uint16_t> &evttypes, uint16_t ruleset)
 {
 	if(m_rulesets.size() < (size_t)ruleset + 1)
 	{

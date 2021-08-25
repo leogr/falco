@@ -33,6 +33,7 @@ limitations under the License.
 #include <getopt.h>
 
 #include <sinsp.h>
+#include <filter.h>
 
 #include "logger.h"
 #include "utils.h"
@@ -464,6 +465,7 @@ int falco_init(int argc, char **argv)
 #ifndef MINIMAL_BUILD
 	string* k8s_api = 0;
 	string* k8s_api_cert = 0;
+	string* k8s_node_name = 0;
 	string* mesos_api = 0;
 #endif
 	string output_format = "";
@@ -759,13 +761,18 @@ int falco_init(int argc, char **argv)
 		engine = new falco_engine(true, alternate_lua_dir);
 		engine->set_extra(output_format, replace_container_info);
 
-		// Create "factories" that can create rules for
+		// Create "factories" that can create filters/formatters for
 		// syscalls and k8s audit events.
-		std::shared_ptr<gen_event_filter_factory> sinsp_factory(new sinsp_filter_factory(m_inspector));
-		std::shared_ptr<gen_event_filter_factory> json_factory(new json_event_filter_factory());
+		std::shared_ptr<gen_event_filter_factory> syscall_filter_factory(new sinsp_filter_factory(inspector));
+		std::shared_ptr<gen_event_filter_factory> k8s_audit_filter_factory(new json_event_filter_factory());
 
-		engine->add_filter_factory("syscall", sinsp_factory);
-		engine->add_filter_factory("k8s_audit", json_factory);
+		std::shared_ptr<gen_event_formatter_factory> syscall_formatter_factory(new sinsp_evt_formatter_factory(inspector));
+		std::shared_ptr<gen_event_formatter_factory> k8s_audit_formatter_factory(new json_event_formatter_factory(k8s_audit_filter_factory));
+
+		string syscall_source = "syscall";
+		string k8s_audit_source = "k8s_audit";
+		engine->add_source(syscall_source, syscall_filter_factory, syscall_formatter_factory);
+		engine->add_source(k8s_audit_source, k8s_audit_filter_factory, k8s_audit_formatter_factory);
 
 		if(list_flds)
 		{
@@ -865,6 +872,12 @@ int falco_init(int argc, char **argv)
 		else
 		{
 			throw std::runtime_error("Could not find configuration file at " + conf_filename);
+		}
+
+		if(config.m_json_output)
+		{
+			syscall_formatter_factory->set_output_format(gen_event_formatter::OF_JSON);
+			k8s_audit_formatter_factory->set_output_format(gen_event_formatter::OF_JSON);
 		}
 
 		if (rules_filenames.size())
@@ -1108,13 +1121,14 @@ int falco_init(int argc, char **argv)
 
 		outputs = new falco_outputs();
 
-		outputs->init(config.m_json_output,
-			config.m_json_include_output_property,
-			config.m_output_timeout,
-			config.m_notifications_rate, config.m_notifications_max_burst,
-			config.m_buffered_outputs,
-			config.m_time_format_iso_8601,
-			hostname);
+		outputs->init(engine,
+			      config.m_json_output,
+			      config.m_json_include_output_property,
+			      config.m_output_timeout,
+			      config.m_notifications_rate, config.m_notifications_max_burst,
+			      config.m_buffered_outputs,
+			      config.m_time_format_iso_8601,
+			      hostname);
 
 		for(auto output : config.m_outputs)
 		{
@@ -1251,7 +1265,7 @@ int falco_init(int argc, char **argv)
 					k8s_api_cert = new string(k8s_cert_env);
 				}
 			}
-			inspector->init_k8s_client(k8s_api, k8s_api_cert, verbose);
+			inspector->init_k8s_client(k8s_api, k8s_api_cert, k8s_node_name, verbose);
 			k8s_api = 0;
 			k8s_api_cert = 0;
 		}
@@ -1267,7 +1281,7 @@ int falco_init(int argc, char **argv)
 					}
 				}
 				k8s_api = new string(k8s_api_env);
-				inspector->init_k8s_client(k8s_api, k8s_api_cert, verbose);
+				inspector->init_k8s_client(k8s_api, k8s_api_cert, k8s_node_name, verbose);
 			}
 			else
 			{

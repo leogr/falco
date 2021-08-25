@@ -30,6 +30,7 @@ extern "C" {
 const static struct luaL_Reg ll_falco_rules[] =
 	{
 		{"clear_filters", &falco_rules::clear_filters},
+		{"create_lua_parser", &falco_rules::create_lua_parser},
 		{"add_filter", &falco_rules::add_filter},
 		{"enable_rule", &falco_rules::enable_rule},
 		{"engine_version", &falco_rules::engine_version},
@@ -42,7 +43,7 @@ falco_rules::falco_rules(falco_engine *engine,
 {
 }
 
-void falco_rules::add_filter_factory(std::string &source,
+void falco_rules::add_filter_factory(const std::string &source,
 				     std::shared_ptr<gen_event_filter_factory> factory)
 {
 	m_filter_factories[source] = factory;
@@ -75,15 +76,15 @@ void falco_rules::clear_filters()
 
 int falco_rules::create_lua_parser(lua_State *ls)
 {
-	if (! lua_islightuserdata(ls, -1) ||
-	    ! lua_isstring(ls, -2))
+	if (! lua_islightuserdata(ls, -2) ||
+	    ! lua_isstring(ls, -1))
 	{
 		lua_pushstring(ls, "Invalid argument passed to create_lua_parser()");
 		lua_error(ls);
 	}
 
-	falco_rules *rules = (falco_rules *) lua_topointer(ls, -1);
-	std::string source = lua_tostring(ls, -2);
+	falco_rules *rules = (falco_rules *) lua_topointer(ls, -2);
+	std::string source = lua_tostring(ls, -1);
 
 	std::string errstr;
 	lua_parser *lp = rules->create_lua_parser(source, errstr);
@@ -141,7 +142,13 @@ int falco_rules::add_filter(lua_State *ls)
 		lua_pop(ls, 1);
 	}
 
-	rules->add_filter(lp->filter(), rule, source, tags);
+	try {
+		rules->add_filter(lp->filter(), rule, source, tags);
+	} catch (exception &e) {
+		std::string errstr = string("Could not add rule to falco engine: ") + e.what();
+		lua_pushstring(ls, errstr.c_str());
+		lua_error(ls);
+	}
 
 	delete lp;
 

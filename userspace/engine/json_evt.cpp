@@ -690,7 +690,7 @@ size_t json_event_filter_check::parsed_size()
 	}
 }
 
-json_event_filter_check::check_info &json_event_filter_check::get_fields()
+json_event_filter_check::check_info &json_event_filter_check::get_info()
 {
 	return m_info;
 }
@@ -1432,7 +1432,7 @@ json_event_filter_factory::json_event_filter_factory()
 
 	for(auto &chk : m_defined_checks)
 	{
-		m_info.push_back(chk->get_fields());
+		m_info.push_back(chk->get_info());
 	}
 }
 
@@ -1474,25 +1474,27 @@ std::list<gen_event_filter_factory::filter_fieldclass_info> json_event_filter_fa
 
 	for(auto &chk: m_defined_checks)
 	{
+		json_event_filter_check::check_info &info = chk->get_info();
 		gen_event_filter_factory::filter_fieldclass_info cinfo;
-		cinfo.name = chk.m_name;
-		cinfo.desc = chk.m_desc;
-		cinfo.class_info = chk.m_class_info;
 
-		for(auto &field : chk->m_fields)
+		cinfo.name = info.m_name;
+		cinfo.desc = info.m_desc;
+		cinfo.class_info = info.m_class_info;
+
+		for(auto &field : info.m_fields)
 		{
 			gen_event_filter_factory::filter_field_info info;
 			info.name = field.m_name;
 			info.desc = field.m_desc;
 
-			switch(field.idx_mode)
+			switch(field.m_idx_mode)
 			{
 			case json_event_filter_check::IDX_REQUIRED:
 			case json_event_filter_check::IDX_ALLOWED:
 				info.desc += " (";
-				info.desc += json_event_filter_check::s_index_mode_strs[field.idx_mode];
+				info.desc += json_event_filter_check::s_index_mode_strs[field.m_idx_mode];
 				info.desc += ", ";
-				info.desc += json_event_filter_check::s_index_type_strs[field.idx_type];
+				info.desc += json_event_filter_check::s_index_type_strs[field.m_idx_type];
 				info.desc += ")";
 				break;
 			case json_event_filter_check::IDX_NONE:
@@ -1509,31 +1511,53 @@ std::list<gen_event_filter_factory::filter_fieldclass_info> json_event_filter_fa
 	return ret;
 }
 
-json_event_formatter::json_event_formatter(json_event_filter_factory &json_factory, std::string &format):
-	m_format(format),
-	m_json_factory(json_factory)
+json_event_formatter::json_event_formatter(std::shared_ptr<gen_event_filter_factory> json_factory)
+	: m_output_format(OF_NORMAL), m_json_factory(json_factory)
 {
-	parse_format();
 }
 
 json_event_formatter::~json_event_formatter()
 {
 }
 
-std::string json_event_formatter::tostring(json_event *ev)
+void json_event_formatter::set_format(output_format of, const std::string &format)
 {
+	m_output_format = of;
+	m_format = format;
+	parse_format();
+}
+
+bool json_event_formatter::tostring_withformat(gen_event *gevt, std::string &output, gen_event_formatter::output_format of)
+{
+	json_event *ev = static_cast<json_event *>(gevt);
+
 	std::string ret;
 
-	std::list<std::pair<std::string, std::string>> resolved;
-
-	resolve_tokens(ev, resolved);
-
-	for(auto &res : resolved)
+	if(of == OF_JSON)
 	{
-		ret += res.second;
+		ret = tojson(ev);
+		return true;
 	}
+	else
+	{
+		std::list<std::pair<std::string, std::string>> resolved;
 
-	return ret;
+		resolve_format(ev, resolved);
+
+		output = "";
+
+		for(auto &res : resolved)
+		{
+			output += res.second;
+		}
+
+		return true;
+	}
+}
+
+bool json_event_formatter::tostring(gen_event *gevt, std::string &output)
+{
+	return tostring_withformat(gevt, output, m_output_format);
 }
 
 std::string json_event_formatter::tojson(json_event *ev)
@@ -1543,7 +1567,7 @@ std::string json_event_formatter::tojson(json_event *ev)
 
 	std::list<std::pair<std::string, std::string>> resolved;
 
-	resolve_tokens(ev, resolved);
+	resolve_format(ev, resolved);
 
 	for(auto &res : resolved)
 	{
@@ -1558,12 +1582,13 @@ std::string json_event_formatter::tojson(json_event *ev)
 	return ret.dump();
 }
 
-std::map<std::string, std::string> json_event_formatter::tomap(json_event *ev)
+bool json_event_formatter::get_field_values(gen_event *gevt, std::map<std::string, std::string> &fields)
 {
-	std::map<std::string, std::string> ret;
+	json_event *ev = static_cast<json_event *>(gevt);
+
 	std::list<std::pair<std::string, std::string>> res;
 
-	resolve_tokens(ev, res);
+	resolve_format(ev, res);
 
 	for(auto &r : res)
 	{
@@ -1574,11 +1599,11 @@ std::map<std::string, std::string> json_event_formatter::tomap(json_event *ev)
 			{
 				r.second = "<NA>";
 			}
-			ret.insert(r);
+			fields.insert(r);
 		}
 	}
 
-	return ret;
+	return true;
 }
 
 void json_event_formatter::parse_format()
@@ -1600,7 +1625,7 @@ void json_event_formatter::parse_format()
 		{
 			// Skip the %
 			tformat.erase(0, 1);
-			json_event_filter_check *chk = (json_event_filter_check *)m_json_factory.new_filtercheck(tformat.c_str());
+			json_event_filter_check *chk = (json_event_filter_check *)m_json_factory->new_filtercheck(tformat.c_str());
 
 			if(!chk)
 			{
@@ -1636,7 +1661,7 @@ void json_event_formatter::parse_format()
 	}
 }
 
-void json_event_formatter::resolve_tokens(json_event *ev, std::list<std::pair<std::string, std::string>> &resolved)
+void json_event_formatter::resolve_format(json_event *ev, std::list<std::pair<std::string, std::string>> &resolved)
 {
 	for(auto tok : m_tokens)
 	{
@@ -1675,4 +1700,44 @@ void json_event_formatter::resolve_tokens(json_event *ev, std::list<std::pair<st
 			resolved.push_back(std::make_pair("", tok.text));
 		}
 	}
+}
+
+gen_event_formatter::output_format json_event_formatter::get_output_format()
+{
+	return m_output_format;
+}
+
+json_event_formatter_factory::json_event_formatter_factory(std::shared_ptr<gen_event_filter_factory> json_factory)
+	: m_output_format(gen_event_formatter::OF_NORMAL),  m_json_factory(json_factory)
+{
+}
+
+json_event_formatter_factory::~json_event_formatter_factory()
+{
+}
+
+void json_event_formatter_factory::set_output_format(gen_event_formatter::output_format of)
+{
+	m_formatters.clear();
+
+	m_output_format = of;
+}
+
+std::shared_ptr<gen_event_formatter> json_event_formatter_factory::create_formatter(const std::string &format)
+{
+	auto it = m_formatters.find(format);
+
+	if (it != m_formatters.end())
+	{
+		return it->second;
+	}
+
+	std::shared_ptr<gen_event_formatter> ret;
+
+	ret.reset(new json_event_formatter(m_json_factory));
+
+	ret->set_format(m_output_format, format);
+	m_formatters[format] = ret;
+
+	return ret;
 }

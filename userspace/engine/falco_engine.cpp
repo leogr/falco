@@ -137,15 +137,14 @@ void falco_engine::load_rules(const string &rules_content, bool verbose, bool al
 	{
 		m_rules.reset(new falco_rules(this,
 					      m_ls));
+
+		for(auto const &it : m_filter_factories)
+		{
+			m_rules->add_filter_factory(it.first, it.second);
+		}
 	}
 
-	// Note that falco_formats is added to the lua state used
-	// by the falco engine only. Within the engine, only
-	// formats.formatter is used, so we can unconditionally set
-	// json_output to false.
-	bool json_output = false;
-	bool json_include_output_property = false;
-	falco_formats::init(m_inspector, this, m_ls, json_output, json_include_output_property);
+	falco_formats_lua::init(m_ls);
 
 	m_rules->load_rules(rules_content, verbose, all_events, m_extra, m_replace_container_info, m_min_priority, required_engine_version);
 }
@@ -180,8 +179,10 @@ void falco_engine::enable_rule(const string &substring, bool enabled, const stri
 	uint16_t ruleset_id = find_ruleset_id(ruleset);
 	bool match_exact = false;
 
-	m_sinsp_rules->enable(substring, match_exact, enabled, ruleset_id);
-	m_k8s_audit_rules->enable(substring, match_exact, enabled, ruleset_id);
+	for(auto &it : m_rulesets)
+	{
+		it.second->enable(substring, match_exact, enabled, ruleset_id);
+	}
 }
 
 void falco_engine::enable_rule(const string &substring, bool enabled)
@@ -194,8 +195,10 @@ void falco_engine::enable_rule_exact(const string &rule_name, bool enabled, cons
 	uint16_t ruleset_id = find_ruleset_id(ruleset);
 	bool match_exact = true;
 
-	m_sinsp_rules->enable(rule_name, match_exact, enabled, ruleset_id);
-	m_k8s_audit_rules->enable(rule_name, match_exact, enabled, ruleset_id);
+	for(auto &it : m_rulesets)
+	{
+		it.second->enable(rule_name, match_exact, enabled, ruleset_id);
+	}
 }
 
 void falco_engine::enable_rule_exact(const string &rule_name, bool enabled)
@@ -207,8 +210,10 @@ void falco_engine::enable_rule_by_tag(const set<string> &tags, bool enabled, con
 {
 	uint16_t ruleset_id = find_ruleset_id(ruleset);
 
-	m_sinsp_rules->enable_tags(tags, enabled, ruleset_id);
-	m_k8s_audit_rules->enable_tags(tags, enabled, ruleset_id);
+	for(auto &it : m_rulesets)
+	{
+		it.second->enable_tags(tags, enabled, ruleset_id);
+	}
 }
 
 void falco_engine::enable_rule_by_tag(const set<string> &tags, bool enabled)
@@ -242,7 +247,7 @@ uint64_t falco_engine::num_rules_for_ruleset(const std::string &ruleset)
 	uint64_t ret = 0;
 	for(auto &it : m_rulesets)
 	{
-		ret += it->second->num_rules_for_ruleset(ruleset_id);
+		ret += it.second->num_rules_for_ruleset(ruleset_id);
 	}
 
 	return ret;
@@ -261,6 +266,20 @@ void falco_engine::evttypes_for_ruleset(std::string &source, std::set<uint16_t> 
 
 	it->second->evttypes_for_ruleset(evttypes, ruleset_id);
 
+}
+
+std::shared_ptr<gen_event_formatter> falco_engine::create_formatter(const std::string &source,
+								    const std::string &output)
+{
+	auto it = m_format_factories.find(source);
+
+	if(it == m_format_factories.end())
+	{
+		string err = "Unknown event source " + source;
+		throw falco_exception(err);
+	}
+
+	return it->second->create_formatter(output);
 }
 
 unique_ptr<falco_engine::rule_result> falco_engine::process_event(std::string &source, gen_event *ev, uint16_t ruleset_id)
@@ -292,7 +311,18 @@ unique_ptr<falco_engine::rule_result> falco_engine::process_event(std::string &s
 
 unique_ptr<falco_engine::rule_result> falco_engine::process_event(std::string &source, gen_event *ev)
 {
-	return process_sinsp_event(source, ev, m_default_ruleset_id);
+	return process_event(source, ev, m_default_ruleset_id);
+}
+
+void falco_engine::add_source(std::string &source,
+		std::shared_ptr<gen_event_filter_factory> filter_factory,
+		std::shared_ptr<gen_event_formatter_factory> formatter_factory)
+{
+	m_filter_factories[source] = filter_factory;
+	m_format_factories[source] = formatter_factory;
+
+	std::shared_ptr<falco_ruleset> ruleset(new falco_ruleset());
+	m_rulesets[source] = ruleset;
 }
 
 void falco_engine::populate_rule_result(unique_ptr<struct rule_result> &res, gen_event *ev)
@@ -378,6 +408,12 @@ void falco_engine::add_filter(std::shared_ptr<gen_event_filter> filter,
 void falco_engine::clear_filters()
 {
 	m_rulesets.clear();
+
+	for(auto &it : m_filter_factories)
+	{
+		std::shared_ptr<falco_ruleset> ruleset(new falco_ruleset());
+		m_rulesets[it.first] = ruleset;
+	}
 }
 
 void falco_engine::set_sampling_ratio(uint32_t sampling_ratio)

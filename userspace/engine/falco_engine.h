@@ -181,10 +181,11 @@ public:
 
 	//
 	// Configure the engine to support events with the provided
-	// source, with the provided filter factory.
+	// source, with the provided filter factory and formatter factory.
 	//
-	void add_filter_factory(std::string &source,
-				std::shared_ptr<gen_event_filter_factory> factory);
+	void add_source(std::string &source,
+			std::shared_ptr<gen_event_filter_factory> filter_factory,
+			std::shared_ptr<gen_event_formatter_factory> formatter_factory);
 
 	//
 	// Add a filter for the provided event source to the engine
@@ -199,8 +200,16 @@ public:
 	// containing the event types for which this ruleset can run.
 	//
 	void evttypes_for_ruleset(std::string &source,
-				  std::vector<bool> &evttypes,
+				  std::set<uint16_t> &evttypes,
 				  const std::string &ruleset);
+
+	//
+	// Given a source and output string, return an
+	// gen_event_formatter that can format output strings for an
+	// event.
+	//
+	std::shared_ptr<gen_event_formatter> create_formatter(const std::string &source,
+							      const std::string &output);
 
 private:
 
@@ -213,6 +222,9 @@ private:
 
 	// Maps from event source to object that can generate filters from rules
 	std::map<std::string, std::shared_ptr<gen_event_filter_factory>> m_filter_factories;
+
+	// Maps from event source to object that can format output strings in rules
+	std::map<std::string, std::shared_ptr<gen_event_formatter_factory>> m_format_factories;
 
 	// Maps from event source to the set of rules for that event source
 	std::map<std::string, std::shared_ptr<falco_ruleset>> m_rulesets;

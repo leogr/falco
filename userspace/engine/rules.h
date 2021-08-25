@@ -36,7 +36,7 @@ class falco_rules
 		    lua_State *ls);
 	~falco_rules();
 
-	void add_filter_factory(std::string &source,
+	void add_filter_factory(const std::string &source,
 				std::shared_ptr<gen_event_filter_factory> factory);
 
 	void load_rules(const string &rules_content, bool verbose, bool all_events,

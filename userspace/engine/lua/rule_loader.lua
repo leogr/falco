@@ -81,9 +81,9 @@ local function create_filter_obj(node, lua_parser, parent_bool_op)
 	 filter.nest(lua_parser) -- io.write("(")
       end
 
-      create_filter_obj(node.left, filter, lua_parser, node.operator)
+      create_filter_obj(node.left, lua_parser, node.operator)
       filter.bool_op(lua_parser, node.operator) -- io.write(" "..node.operator.." ")
-      create_filter_obj(node.right, filter, lua_parser, node.operator)
+      create_filter_obj(node.right, lua_parser, node.operator)
 
       if (not (node.operator == parent_bool_op)) then
 	 filter.unnest(lua_parser) -- io.write(")")
@@ -92,7 +92,7 @@ local function create_filter_obj(node, lua_parser, parent_bool_op)
    elseif t == "UnaryBoolOp" then
       filter.nest(lua_parser) --io.write("(")
       filter.bool_op(lua_parser, node.operator) -- io.write(" "..node.operator.." ")
-      create_filter_obj(node.argument, filter, lua_parser)
+      create_filter_obj(node.argument, lua_parser)
       filter.unnest(lua_parser) -- io.write(")")
 
    elseif t == "BinaryRelOp" then
@@ -989,10 +989,8 @@ function load_rules(rules_content,
 	 -- Ensure that the output field is properly formatted by
 	 -- creating a formatter from it. Any error will be thrown
 	 -- up to the top level.
-	 local err, formatter = formats.formatter(v['source'], v['output'])
-	 if err == nil then
-	    formats.free_formatter(v['source'], formatter)
-	 else
+	 local err = formats.is_format_valid(rules_mgr, v['source'], v['output'])
+	 if err ~= nil then
 	    return false, nil, build_error_with_context(v['context'], err), warnings
 	 end
       else
