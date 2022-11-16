@@ -28,7 +28,7 @@ else()
   # ie., `cmake -DFALCOSECURITY_LIBS_VERSION=dev ..`
   if(NOT FALCOSECURITY_LIBS_VERSION)
     set(FALCOSECURITY_LIBS_VERSION "new/emscripten_build")
-    set(FALCOSECURITY_LIBS_CHECKSUM "SHA256=cdf71f47731b829aa9f5bd01014c2651476f5bf9f430ae1eadcd4a6a1209e956")
+    set(FALCOSECURITY_LIBS_CHECKSUM "SHA256=a4f87845f483da7c82d4992c35999a5762475f0097d7bf204a3ba964da72d020")
   endif()
 
   # cd /path/to/build && cmake /path/to/source

@@ -21,14 +21,15 @@ option(EMSCRIPTEN_BUILD "Produce a minimal build to work with Emscripten")
 option(MUSL_OPTIMIZED_BUILD "Enable if you want a musl optimized build" OFF)
 
 if(EMSCRIPTEN_BUILD)
-	set(MINIMAL_BUILD ON CACHE BOOL "" FORCE)
-	set(USE_BUNDLED_DEPS ON CACHE BOOL "" FORCE)
+  set(MINIMAL_BUILD ON CACHE BOOL "" FORCE)
+  set(USE_BUNDLED_DEPS ON CACHE BOOL "" FORCE)
 endif()
 
 # gVisor is currently only supported on Linux x86_64
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" AND CMAKE_SYSTEM_NAME MATCHES "Linux" AND NOT MINIMAL_BUILD)
   option(BUILD_FALCO_GVISOR "Build gVisor support for Falco" ON)
-  if (BUILD_FALCO_GVISOR)
+
+  if(BUILD_FALCO_GVISOR)
     add_definitions(-DHAS_GVISOR)
   endif()
 endif()
@@ -36,6 +37,7 @@ endif()
 # Modern BPF is not supported on not Linux systems and in MINIMAL_BUILD
 if(CMAKE_SYSTEM_NAME MATCHES "Linux" AND NOT MINIMAL_BUILD)
   option(BUILD_FALCO_MODERN_BPF "Build modern BPF support for Falco" OFF)
+
   if(BUILD_FALCO_MODERN_BPF)
     add_definitions(-DHAS_MODERN_BPF)
   endif()
@@ -43,12 +45,12 @@ endif()
 
 # We shouldn't need to set this, see https://gitlab.kitware.com/cmake/cmake/-/issues/16419
 option(EP_UPDATE_DISCONNECTED "ExternalProject update disconnected" OFF)
-if (${EP_UPDATE_DISCONNECTED})
+
+if(${EP_UPDATE_DISCONNECTED})
   set_property(
     DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     PROPERTY EP_UPDATE_DISCONNECTED TRUE)
 endif()
-
 
 # Elapsed time
 # set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CMAKE_COMMAND} -E time") # TODO(fntlnz, leodido): add a flag to enable this
@@ -56,6 +58,7 @@ endif()
 # Make flag for parallel processing
 include(ProcessorCount)
 processorcount(PROCESSOR_COUNT)
+
 if(NOT PROCESSOR_COUNT EQUAL 0)
   set(PROCESSOUR_COUNT_MAKE_FLAG -j${PROCESSOR_COUNT})
 endif()
@@ -78,6 +81,7 @@ if(NOT FALCO_EXTRA_DEBUG_FLAGS)
 endif()
 
 string(TOLOWER "${CMAKE_BUILD_TYPE}" CMAKE_BUILD_TYPE)
+
 if(CMAKE_BUILD_TYPE STREQUAL "debug")
   set(KBUILD_FLAGS "${FALCO_EXTRA_DEBUG_FLAGS} ${FALCO_EXTRA_FEATURE_FLAGS}")
 else()
@@ -85,6 +89,7 @@ else()
   set(KBUILD_FLAGS "${FALCO_EXTRA_FEATURE_FLAGS}")
   add_definitions(-DBUILD_TYPE_RELEASE)
 endif()
+
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
 if(MINIMAL_BUILD)
@@ -99,6 +104,7 @@ endif()
 # explicitly set hardening flags
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(FALCO_SECURITY_FLAGS "-Wl,-z,relro,-z,now -fstack-protector-strong")
+
 if(CMAKE_BUILD_TYPE STREQUAL "release")
   set(FALCO_SECURITY_FLAGS "${FALCO_SECURITY_FLAGS} -D_FORTIFY_SOURCE=2")
 endif()
@@ -107,7 +113,7 @@ set(CMAKE_COMMON_FLAGS "${FALCO_SECURITY_FLAGS} -Wall -ggdb ${FALCO_EXTRA_FEATUR
 
 if(BUILD_WARNINGS_AS_ERRORS)
   set(CMAKE_SUPPRESSED_WARNINGS
-      "-Wno-unused-parameter -Wno-unused-variable -Wno-unused-but-set-variable -Wno-missing-field-initializers -Wno-sign-compare -Wno-type-limits -Wno-implicit-fallthrough -Wno-format-truncation -Wno-stringop-truncation -Wno-stringop-overflow -Wno-restrict"
+    "-Wno-unused-parameter -Wno-unused-variable -Wno-unused-but-set-variable -Wno-missing-field-initializers -Wno-sign-compare -Wno-type-limits -Wno-implicit-fallthrough -Wno-format-truncation -Wno-stringop-truncation -Wno-stringop-overflow -Wno-restrict"
   )
   set(CMAKE_COMMON_FLAGS "${CMAKE_COMMON_FLAGS} -Wextra -Werror ${CMAKE_SUPPRESSED_WARNINGS}")
 endif()
@@ -134,13 +140,13 @@ set(FALCO_PROBE_BPF_FILEPATH ".${DRIVER_NAME}/${DRIVER_NAME}-bpf.o")
 add_definitions(-DFALCO_PROBE_BPF_FILEPATH="${FALCO_PROBE_BPF_FILEPATH}")
 
 if(NOT DEFINED FALCO_COMPONENT_NAME)
-    set(FALCO_COMPONENT_NAME "${CMAKE_PROJECT_NAME}")
+  set(FALCO_COMPONENT_NAME "${CMAKE_PROJECT_NAME}")
 endif()
 
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   set(CMAKE_INSTALL_PREFIX
-      /usr
-      CACHE PATH "Default install path" FORCE)
+    /usr
+    CACHE PATH "Default install path" FORCE)
 endif()
 
 set(CMD_MAKE make)
@@ -184,16 +190,19 @@ endif()
 
 include(cxxopts)
 
-# One TBB
-include(tbb)
+if(NOT EMSCRIPTEN_BUILD)
+  # One TBB
+  include(tbb)
+endif()
 
-#string-view-lite
+# string-view-lite
 include(DownloadStringViewLite)
 
 if(NOT MINIMAL_BUILD)
   include(zlib)
   include(cares)
   include(protobuf)
+
   # gRPC
   include(grpc)
 endif()
@@ -230,8 +239,11 @@ set(FALCO_BIN_DIR bin)
 
 add_subdirectory(scripts)
 add_subdirectory(userspace/engine)
-add_subdirectory(userspace/falco)
-add_subdirectory(tests)
+
+if(NOT EMSCRIPTEN_BUILD)
+  add_subdirectory(userspace/falco)
+  add_subdirectory(tests)
+endif()
 
 if(NOT MUSL_OPTIMIZED_BUILD)
   include(plugins)

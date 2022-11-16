@@ -39,7 +39,6 @@ if(MINIMAL_BUILD)
     falco_engine
     PUBLIC
       "${NJSON_INCLUDE}"
-      "${TBB_INCLUDE_DIR}"
       "${STRING_VIEW_LITE_INCLUDE}"
       "${LIBSCAP_INCLUDE_DIRS}"
       "${LIBSINSP_INCLUDE_DIRS}"
@@ -50,7 +49,6 @@ else()
     falco_engine
     PUBLIC
       "${NJSON_INCLUDE}"
-      "${TBB_INCLUDE_DIR}"
       "${STRING_VIEW_LITE_INCLUDE}"
       "${LIBSCAP_INCLUDE_DIRS}"
       "${LIBSINSP_INCLUDE_DIRS}"
