@@ -17,7 +17,13 @@ project(falco)
 option(USE_BUNDLED_DEPS "Bundle hard to find dependencies into the Falco binary" OFF)
 option(BUILD_WARNINGS_AS_ERRORS "Enable building with -Wextra -Werror flags" OFF)
 option(MINIMAL_BUILD "Build a minimal version of Falco, containing only the engine and basic input/output (EXPERIMENTAL)" OFF)
+option(EMSCRIPTEN_BUILD "Produce a minimal build to work with Emscripten")
 option(MUSL_OPTIMIZED_BUILD "Enable if you want a musl optimized build" OFF)
+
+if(EMSCRIPTEN_BUILD)
+	set(MINIMAL_BUILD ON CACHE BOOL "" FORCE)
+	set(USE_BUNDLED_DEPS ON CACHE BOOL "" FORCE)
+endif()
 
 # gVisor is currently only supported on Linux x86_64
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" AND CMAKE_SYSTEM_NAME MATCHES "Linux" AND NOT MINIMAL_BUILD)

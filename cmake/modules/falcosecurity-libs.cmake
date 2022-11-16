@@ -43,7 +43,11 @@ endif()
 set(LIBS_PACKAGE_NAME "falcosecurity")
 
 add_definitions(-D_GNU_SOURCE)
-add_definitions(-DHAS_CAPTURE)
+if(EMSCRIPTEN_BUILD)
+  add_definitions(-DEMSCRIPTEN_BUILD)
+else()
+  add_definitions(-DHAS_CAPTURE)
+endif()
 
 if(MUSL_OPTIMIZED_BUILD)
   add_definitions(-DMUSL_OPTIMIZED)
