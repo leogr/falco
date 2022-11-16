@@ -101,12 +101,14 @@ if(MUSL_OPTIMIZED_BUILD)
   add_definitions(-DMUSL_OPTIMIZED)
 endif()
 
-# explicitly set hardening flags
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-set(FALCO_SECURITY_FLAGS "-Wl,-z,relro,-z,now -fstack-protector-strong")
+if (NOT EMSCRIPTEN_BUILD)
+  # explicitly set hardening flags
+  set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+  set(FALCO_SECURITY_FLAGS "-Wl,-z,relro,-z,now -fstack-protector-strong")
 
-if(CMAKE_BUILD_TYPE STREQUAL "release")
-  set(FALCO_SECURITY_FLAGS "${FALCO_SECURITY_FLAGS} -D_FORTIFY_SOURCE=2")
+  if(CMAKE_BUILD_TYPE STREQUAL "release")
+    set(FALCO_SECURITY_FLAGS "${FALCO_SECURITY_FLAGS} -D_FORTIFY_SOURCE=2")
+  endif()
 endif()
 
 set(CMAKE_COMMON_FLAGS "${FALCO_SECURITY_FLAGS} -Wall -ggdb ${FALCO_EXTRA_FEATURE_FLAGS} ${MINIMAL_BUILD_FLAGS} ${MUSL_FLAGS}")
