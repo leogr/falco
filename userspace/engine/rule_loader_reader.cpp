@@ -441,17 +441,17 @@ bool rule_loader::reader::read(rule_loader::configuration& cfg, collector& colle
 	{
 		docs = YAML::LoadAll(cfg.content);
 	}
-	catch(std::exception& e)
-	{
-		rule_loader::context ctx(cfg.name);
-		cfg.res->add_error(falco::load_result::LOAD_ERR_YAML_PARSE, e.what(), ctx);
-		return false;
-	}
 	catch(YAML::ParserException& e)
 	{
 		rule_loader::context ctx(cfg.name);
 		rule_loader::context ictx(e.mark, ctx);
 		cfg.res->add_error(falco::load_result::LOAD_ERR_YAML_PARSE, e.what(), ictx);
+		return false;
+	}
+	catch(std::exception& e)
+	{
+		rule_loader::context ctx(cfg.name);
+		cfg.res->add_error(falco::load_result::LOAD_ERR_YAML_PARSE, e.what(), ctx);
 		return false;
 	}
 	catch(...)
